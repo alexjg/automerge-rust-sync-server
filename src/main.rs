@@ -11,8 +11,9 @@ use tracing_subscriber;
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    // let storage = FsStorage::open("/tmp/automerge-server-data").unwrap();
-    let storage = FsStorage::open("./automerge-server-data").unwrap();
+    let data_dir =
+        std::env::var("DATA_DIR").unwrap_or_else(|_| "/tmp/automerge-server-data".to_string());
+    let storage = FsStorage::open(data_dir).unwrap();
     let repo = Repo::new(Some("sync-server".to_string()), Box::new(storage));
     let repo_handle = repo.run();
 
@@ -24,19 +25,20 @@ async fn main() {
         let addr = format!("0.0.0.0:{}", port);
         let listener = TcpListener::bind(&addr).await.unwrap();
 
-        println!("started server on localhost:{}", port);
-        println!("repo id: {:?}", repo_clone.get_repo_id().clone());
+        tracing::info!("started server on localhost:{}", port);
+        tracing::info!("repo id: {:?}", repo_clone.get_repo_id().clone());
 
         loop {
             match listener.accept().await {
                 Ok((mut socket, addr)) => {
-                    println!("client connected");
+                    tracing::info!("client connected");
 
                     // Read first few bytes to check if it's HTTP
                     let mut buf = [0; 4];
                     match socket.peek(&mut buf).await {
                         Ok(_) => {
                             if buf.starts_with(b"GET ") || buf.starts_with(b"POST") {
+                                tracing::info!("serving http request");
                                 // It's an HTTP request, send 200 OK
 
                                 // Extract the path from the HTTP request
@@ -52,7 +54,7 @@ async fn main() {
                                 };
 
                                 let content = if let Some(ref path) = path {
-                                  println!("path: {}", path);
+                                  tracing::debug!("path: {}", path);
 
 
                                   let parts: Vec<&str> = path[1..].split('/').collect();
@@ -101,7 +103,7 @@ async fn main() {
                             }
                         }
                         Err(e) => {
-                            println!("Error peeking socket: {:?}", e);
+                            tracing::error!(err=?e, "error peeking socket");
                             continue;
                         }
                     }
@@ -128,7 +130,7 @@ async fn main() {
                         }
                     });
                 }
-                Err(e) => println!("couldn't get client: {:?}", e),
+                Err(e) => tracing::error!(err=?e, "couldn't get client"),
             }
         }
     });
