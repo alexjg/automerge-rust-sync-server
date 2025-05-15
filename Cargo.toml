@@ -4,10 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-automerge = "0.5.12"
+automerge = "0.6"
 #automerge_repo = { version = "0.1.0", features = ["tokio"] }
-automerge_repo = { version = "0.2.0", features = ["tokio"] }
+# automerge_repo = { version = "0.2.0", features = ["tokio"] }
+automerge_repo = { git = "https://github.com/automerge/automerge-repo-rs.git", branch = "conn-finished-reason", features = [
+    "tokio",
+] }
 futures = "0.3.31"
 tokio = { version = "1.41.1", features = ["full"] }
 tracing-subscriber = "0.3.18"
 serde_json = "1.0.138"
+tracing = "0.1.41"

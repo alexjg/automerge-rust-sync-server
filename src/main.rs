@@ -11,12 +11,12 @@ use tracing_subscriber;
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let storage = FsStorage::open("/tmp/automerge-server-data").unwrap();
+    // let storage = FsStorage::open("/tmp/automerge-server-data").unwrap();
+    let storage = FsStorage::open("./automerge-server-data").unwrap();
     let repo = Repo::new(Some("sync-server".to_string()), Box::new(storage));
     let repo_handle = repo.run();
 
     let handle = Handle::current();
-
 
     let repo_clone = repo_handle.clone();
     handle.spawn(async move {
@@ -53,8 +53,8 @@ async fn main() {
 
                                 let content = if let Some(ref path) = path {
                                   println!("path: {}", path);
-                                  
-                                  
+
+
                                   let parts: Vec<&str> = path[1..].split('/').collect();
                                   match parts.get(0) {
                                     Some(id_str) => {
@@ -86,7 +86,7 @@ async fn main() {
                                       }
                                     },
                                     None => {
-                                      String::from("error")                                    
+                                      String::from("error")
                                     }
                                   }
                                 } else {
@@ -110,13 +110,21 @@ async fn main() {
                     tokio::spawn({
                         let repo_clone = repo_clone.clone();
                         async move {
-                            match repo_clone
+                            let conn_complete = match repo_clone
                                 .connect_tokio_io(addr, socket, ConnDirection::Incoming)
                                 .await
                             {
-                                Ok(_) => println!("Client connection completed successfully"),
-                                Err(e) => println!("Client connection error: {:?}", e),
-                            }
+                                Ok(completion) => {
+                                    tracing::info!("client connection handshake completed");
+                                    completion
+                                },
+                                Err(e) => {
+                                    tracing::info!(err=?e, "client connection handshake error");
+                                    return;
+                                }
+                            };
+                            let result = conn_complete.await;
+                            tracing::info!(reason=?result, "connection finished");
                         }
                     });
                 }
@@ -130,12 +138,11 @@ async fn main() {
     repo_handle.stop().unwrap();
 }
 
-
 fn doc_to_string_full(doc_handle: &DocHandle) -> String {
-  let checked_out_doc_json =
-      doc_handle.with_doc(|d| serde_json::to_string(&automerge::AutoSerde::from(d)).unwrap());
+    let checked_out_doc_json =
+        doc_handle.with_doc(|d| serde_json::to_string(&automerge::AutoSerde::from(d)).unwrap());
 
-  checked_out_doc_json.to_string()
+    checked_out_doc_json.to_string()
 }
 
 fn doc_to_string(doc_handle: &DocHandle) -> String {
